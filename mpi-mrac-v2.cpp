@@ -74,13 +74,14 @@ void split(vector<int> &nb_split, int max_size) {
       if (i - j >= j) {
         dp[i][j] += dp[i - j][j];
       }
+      //nb_split[i] += j * dp[i][j];
       nb_split[i] += dp[i][j];
     }
   }
 }
 
 double get_p_from_beta_1(vector<int> &bt) {
-  std::unordered_map<uint32_t, uint32_t> mp;
+  std::map<uint32_t, uint32_t> mp;
   for (auto i : bt) {
     mp[i]++;
   }
@@ -89,16 +90,18 @@ double get_p_from_beta_1(vector<int> &bt) {
   for (auto &kv : mp) {
     uint32_t fi = kv.second;
     uint32_t si = kv.first;
-    ret *= 1.0 / EMFSD::factorial(fi);
+    ret *= EMFSD::factorial(fi);
   }
 
-  return ret;
+  return 1.0 / ret;
 }
 
-double get_p_from_beta_2(vector<int> &bt, double *now_dist, double now_n, int w,
-                         double ret) {
+double get_p_from_beta_2(vector<int> &bt, double *now_dist, double now_n, int w) {
+  double ret = 1.0;
+  double r = now_n / w;
   for (auto i : bt) {
-    ret *= now_n * now_dist[i] / w;
+    ret *= now_dist[i];
+    ret *= r;
   }
   return ret;
 }
@@ -113,8 +116,10 @@ void mrac_worker(int world_rank, int world_size) {
   int lend = split[world_rank - 1] + 1;
   int rend = split[world_rank];
 
-  // cout << "processor " << world_rank << " [" << lend << " " << rend << "]"
-  //      << endl;
+  /*
+  cout << "processor " << world_rank << " [" << lend << " " << rend << "]"
+       << endl;
+  */
 
   int *counter_dist = new int[max_size + 1];
   double *dist_new = new double[max_size + 1];
@@ -127,6 +132,8 @@ void mrac_worker(int world_rank, int world_size) {
 
   vector<vector<int>> bts_result[max_size + 1];
   vector<double> p1[max_size + 1];
+  size_t max_bts_size = 0, total_bts_size = 0;
+
   for (int i = lend; i <= rend; i++) {
     if (counter_dist[i] == 0) {
       continue;
@@ -138,23 +145,36 @@ void mrac_worker(int world_rank, int world_size) {
       for (int j = 0; j < bts.now_flow_num; j++) {
         tmp.push_back(bts.now_result[j]);
       }
-      bts_result[i].push_back(tmp);
       p1[i].push_back(get_p_from_beta_1(tmp));
+      bts_result[i].push_back(move(tmp));
+      total_bts_size += bts.now_flow_num;
     }
+
+    max_bts_size = max(max_bts_size, bts_result[i].size());
   }
+
+  /*
+  cout << "processor " << world_rank << " ["
+       << "total_bts_size = " << total_bts_size << "]"
+       << endl;
+  */
+
+  double *ps = new double[max_bts_size];
 
   MPI_Bcast(dist_new, max_size + 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
   MPI_Bcast(&n_new, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
   for (int epoch = 1; epoch <= END_EPOCH; epoch += 1) {
-    // cout << "processor " << world_rank << " epoch " << epoch << " begin"
-    //      << endl;
+    /*
+    cout << "processor " << world_rank << " epoch " << epoch << " begin"
+         << endl;
     auto t1 = system_clock::now();
+    */
 
     memcpy(dist_old, dist_new, (max_size + 1) * sizeof(double));
     n_old = n_new;
 
-    double lambda = std::exp(n_old / double(w));
+    // double lambda = std::exp(n_old / double(w));
 
     memset(ns, 0, (max_size + 1) * sizeof(double));
 
@@ -165,15 +185,15 @@ void mrac_worker(int world_rank, int world_size) {
 
       double sum_p = 0;
       for (int j = 0; j < bts_result[i].size(); j++) {
-        double p = get_p_from_beta_2(bts_result[i][j], dist_old, n_old, w,
-                                     p1[i][j] * lambda);
+        double p = get_p_from_beta_2(bts_result[i][j], dist_old, n_old, w);
+        p *= p1[i][j];
         sum_p += p;
+        ps[j] = p;
       }
       for (int j = 0; j < bts_result[i].size(); j++) {
-        double p = get_p_from_beta_2(bts_result[i][j], dist_old, n_old, w,
-                                     p1[i][j] * lambda);
-        for (auto j : bts_result[i][j]) {
-          ns[j] += counter_dist[i] * p / sum_p;
+        double p = counter_dist[i] * ps[j] / sum_p;
+        for (auto k : bts_result[i][j]) {
+          ns[k] += p;
         }
       }
     }
@@ -183,11 +203,13 @@ void mrac_worker(int world_rank, int world_size) {
       n_ns += ns[i];
     }
 
+    /*
     auto t2 = system_clock::now();
     auto duration = duration_cast<microseconds>(t2 - t1).count();
 
-    // cout << "processor " << world_rank << " epoch " << epoch << " finish"
-    //      << " duration " << double(duration) / 1000000 << endl;
+    cout << "processor " << world_rank << " epoch " << epoch << " finish"
+         << " duration " << double(duration) / 1000000 << endl;
+    */
 
     MPI_Allreduce(&n_ns, &n_new, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
     MPI_Allreduce(ns, dist_new, max_size + 1, MPI_DOUBLE, MPI_SUM,
@@ -219,7 +241,8 @@ void mrac_controller(int world_size) {
       Real_Freq[str]++;
     }
 
-    for (auto [flow, size] : Real_Freq) {
+    for (auto &it : Real_Freq) {
+      auto size = it.second;
       Real_Dist[size] += 1;
     }
 
@@ -302,9 +325,9 @@ void mrac_controller(int world_size) {
     }
 
     delete mrac;
-    delete split;
-    delete counter_dist;
-    delete dist_new;
+    delete[] split;
+    delete[] counter_dist;
+    delete[] dist_new;
 
     Real_Freq.clear();
     Real_Dist.clear();

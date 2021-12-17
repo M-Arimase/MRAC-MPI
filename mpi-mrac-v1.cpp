@@ -77,19 +77,21 @@ void split(vector<int> &nb_split, int max_size) {
   }
 }
 
-double get_p_from_beta(EMFSD::BetaGenerator &bt, double lambda,
-                       double *now_dist, double now_n, int w) {
-  std::unordered_map<uint32_t, uint32_t> mp;
+double get_p_from_beta(EMFSD::BetaGenerator &bt, double *now_dist, double now_n, int w) {
+  std::map<uint32_t, uint32_t> mp;
   for (int i = 0; i < bt.now_flow_num; ++i) {
     mp[bt.now_result[i]]++;
   }
 
-  double ret = std::exp(-lambda);
+  // double ret = std::exp(-lambda);
+  double ret = 1.0;
+  double div_n_w = now_n / w;
   for (auto &kv : mp) {
     uint32_t fi = kv.second;
     uint32_t si = kv.first;
-    double lambda_i = now_n * (now_dist[si]) / w;
-    ret *= (std::pow(lambda_i, fi)) / EMFSD::factorial(fi);
+    double lambda_i = now_dist[si] * div_n_w;
+    for (uint32_t k = 1; k <= fi; ++k)
+      ret *= lambda_i / k;
   }
 
   return ret;
@@ -131,7 +133,6 @@ void mrac_worker(int world_rank, int world_size) {
 
     memset(ns, 0, (max_size + 1) * sizeof(double));
 
-    int64_t sum = 0;
     for (uint32_t i = lend; i <= rend; ++i) {
       if (counter_dist[i] == 0) {
         continue;
@@ -140,14 +141,14 @@ void mrac_worker(int world_rank, int world_size) {
       EMFSD::BetaGenerator bts1(i), bts2(i);
       double sum_p = 0;
       while (bts1.get_next()) {
-        double p = get_p_from_beta(bts1, lambda, dist_old, n_old, w);
+        double p = get_p_from_beta(bts1, dist_old, n_old, w);
         sum_p += p;
       }
       while (bts2.get_next()) {
-        double p = get_p_from_beta(bts2, lambda, dist_old, n_old, w);
+        double p = get_p_from_beta(bts2, dist_old, n_old, w);
+        p = counter_dist[i] * p / sum_p;
         for (int j = 0; j < bts2.now_flow_num; ++j) {
-          ns[bts2.now_result[j]] += counter_dist[i] * p / sum_p;
-          sum += 1;
+          ns[bts2.now_result[j]] += p;
         }
       }
     }
@@ -197,7 +198,8 @@ void mrac_controller(int world_size) {
       Real_Freq[str]++;
     }
 
-    for (auto [flow, size] : Real_Freq) {
+    for (auto &it : Real_Freq) {
+      auto size = it.second;
       Real_Dist[size] += 1;
     }
 
@@ -275,9 +277,9 @@ void mrac_controller(int world_size) {
     }
 
     delete mrac;
-    delete split;
-    delete counter_dist;
-    delete dist_new;
+    delete[] split;
+    delete[] counter_dist;
+    delete[] dist_new;
 
     Real_Freq.clear();
     Real_Dist.clear();

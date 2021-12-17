@@ -1,0 +1,6 @@
+.vscode/
+*.o
+
+mrac
+mpi-mrac-v1
+mpi-mrac-v2

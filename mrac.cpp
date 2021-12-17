@@ -58,15 +58,16 @@ int main() {
     }
 
     int max_size = 0;
-    for (auto [flow, size] : Real_Freq) {
+    for (auto &it : Real_Freq) {
+      auto size = it.second;
       Real_Dist[size] += 1;
       max_size = max(max_size, size);
     }
 
     mrac->collect_fsd();
 
-    printf("%d.dat: ", datafileCnt - 1);
-    printf("flow size distribution: <flow size, count>\n");
+    // printf("%d.dat: ", datafileCnt - 1);
+    // printf("flow size distribution: <flow size, count>\n");
 
     for (int epoch = 1; epoch <= 20; epoch += 1) {
       auto t1 = system_clock::now();
