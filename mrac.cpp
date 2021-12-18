@@ -69,9 +69,23 @@ int main() {
     // printf("%d.dat: ", datafileCnt - 1);
     // printf("flow size distribution: <flow size, count>\n");
 
+#ifdef USE_BUFFER
+    {
+      auto t1 = system_clock::now();
+      mrac->alloc_buf();
+      auto t2 = system_clock::now();
+      auto duration = duration_cast<microseconds>(t2 - t1).count();
+      cout << "prepare: " << double(duration) / 1000000 << endl;
+    }
+#endif
+
     for (int epoch = 1; epoch <= 20; epoch += 1) {
       auto t1 = system_clock::now();
+#ifdef USE_BUFFER
+      mrac->next_epoch_save();
+#else
       mrac->next_epoch();
+#endif
       auto t2 = system_clock::now();
       auto duration = duration_cast<microseconds>(t2 - t1).count();
 

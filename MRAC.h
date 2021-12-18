@@ -48,6 +48,8 @@ public:
   }
 
   void next_epoch() { em_fsd_algo->next_epoch(); }
+  void next_epoch_save() { em_fsd_algo->next_epoch_save(); }
+  void alloc_buf() { em_fsd_algo->alloc_buf(); }
 
   void get_distribution(vector<double> &dist_est) {
     dist_est = em_fsd_algo->ns;

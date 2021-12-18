@@ -2,5 +2,6 @@
 *.o
 
 mrac
+mrac-buf
 mpi-mrac-v1
 mpi-mrac-v2

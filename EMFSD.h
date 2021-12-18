@@ -10,6 +10,12 @@
 using std::vector;
 
 class EMFSD {
+private:
+  vector<vector<int>> *bts_result;
+  vector<double> *p1;
+  double *ps;
+  bool has_buf;
+
 public:
   uint32_t w;
   vector<int> counter_dist;
@@ -167,6 +173,7 @@ public:
     //            }
     //            cout << endl;
     //        }
+    has_buf = false;
   }
 
   void set_counters(uint32_t _w, uint32_t *counters) {
@@ -219,8 +226,103 @@ public:
       }
       while (bts2.get_next()) {
         double p = get_p_from_beta(bts2, lambda, dist_old, n_old);
+        p = counter_dist[i] * p / sum_p;
         for (int j = 0; j < bts2.now_flow_num; ++j) {
-          ns[bts2.now_result[j]] += counter_dist[i] * p / sum_p;
+          ns[bts2.now_result[j]] += p;
+        }
+      }
+    }
+
+    n_new = 0;
+    for (uint32_t i = 1; i < counter_dist.size(); i++) {
+      //            ns[i] = int(ns[i]); // TODO
+      n_new += ns[i];
+    }
+    for (uint32_t i = 1; i < counter_dist.size(); i++) {
+      //            ns[i] = int(ns[i]);
+      dist_new[i] = ns[i] / n_new;
+    }
+
+    n_sum = n_new;
+    //        std::cout << ns[1] << std::endl;
+  }
+
+  static double get_p_from_beta_1(const vector<int> &bt) {
+    std::map<uint32_t, uint32_t> mp;
+    for (auto i : bt) {
+      mp[i]++;
+    }
+
+    double ret = 1.0;
+    for (auto &kv : mp) {
+      uint32_t fi = kv.second;
+      uint32_t si = kv.first;
+      ret *= EMFSD::factorial(fi);
+    }
+
+    return 1.0 / ret;
+  }
+
+  static double get_p_from_beta_2(const vector<int> &bt, const vector<double> &now_dist, double now_n, int w) {
+    double ret = 1.0;
+    double r = now_n / w;
+    for (auto i : bt) {
+      ret *= now_dist[i];
+      ret *= r;
+    }
+    return ret;
+  }
+
+  void alloc_buf() {
+    size_t max_size = counter_dist.size();
+    bts_result = new vector<vector<int>>[max_size + 1];
+    p1 = new vector<double>[max_size + 1];
+    size_t max_bts_size = 0, total_bts_size = 0;
+    for (size_t i = 1; i <= counter_dist.size(); i++) {
+      if (counter_dist[i] == 0) {
+        continue;
+      }
+      EMFSD::BetaGenerator bts(i);
+      while (bts.get_next()) {
+        vector<int> tmp(bts.now_result.begin(), bts.now_result.begin() + bts.now_flow_num);
+        p1[i].push_back(get_p_from_beta_1(tmp));
+        bts_result[i].push_back(move(tmp));
+      }
+      max_bts_size = max(max_bts_size, bts_result[i].size());
+    }
+    ps = new double[max_bts_size];
+    has_buf = true;
+  }
+
+  void next_epoch_save() {
+    dist_old = dist_new;
+    n_old = n_new;
+
+    double lambda = n_old / double(w);
+
+    std::fill(ns.begin(), ns.end(), 0);
+
+    size_t max_size = counter_dist.size();
+    if (!has_buf) {
+      std::cerr << "no buffer!!" << std::endl;
+      alloc_buf();
+    }
+    for (uint32_t i = 1; i < counter_dist.size(); ++i) {
+      // enum how to form val:i
+      if (counter_dist[i] == 0) {
+        continue;
+      }
+      double sum_p = 0;
+      for (int j = 0; j < bts_result[i].size(); j++) {
+        double p = get_p_from_beta_2(bts_result[i][j], dist_old, n_old, w);
+        p *= p1[i][j];
+        sum_p += p;
+        ps[j] = p;
+      }
+      for (int j = 0; j < bts_result[i].size(); j++) {
+        double p = counter_dist[i] * ps[j] / sum_p;
+        for (auto k : bts_result[i][j]) {
+          ns[k] += p;
         }
       }
     }

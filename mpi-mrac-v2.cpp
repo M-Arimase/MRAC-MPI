@@ -74,13 +74,13 @@ void split(vector<int> &nb_split, int max_size) {
       if (i - j >= j) {
         dp[i][j] += dp[i - j][j];
       }
-      //nb_split[i] += j * dp[i][j];
-      nb_split[i] += dp[i][j];
+      nb_split[i] += dp[i][j] * j;
+      //nb_split[i] += dp[i][j];
     }
   }
 }
 
-double get_p_from_beta_1(vector<int> &bt) {
+double get_p_from_beta_1(const vector<int> &bt) {
   std::map<uint32_t, uint32_t> mp;
   for (auto i : bt) {
     mp[i]++;
@@ -96,7 +96,7 @@ double get_p_from_beta_1(vector<int> &bt) {
   return 1.0 / ret;
 }
 
-double get_p_from_beta_2(vector<int> &bt, double *now_dist, double now_n, int w) {
+double get_p_from_beta_2(const vector<int> &bt, double *now_dist, double now_n, int w) {
   double ret = 1.0;
   double r = now_n / w;
   for (auto i : bt) {
@@ -213,7 +213,7 @@ void mrac_worker(int world_rank, int world_size) {
                   MPI_COMM_WORLD);
 
     for (uint32_t i = 1; i <= max_size; i++) {
-      dist_new[i] = dist_new[i] / n_new;
+      dist_new[i] /= n_new;
     }
   }
 
@@ -256,6 +256,10 @@ void mrac_controller(int world_size) {
 
     vector<int> nb_split;
     split(nb_split, max_size);
+
+    auto T2 = system_clock::now();
+    auto Dura = duration_cast<microseconds>(T2 - T1).count();
+    cout << "dp: " << double(Dura) / 1000000 << endl;
 
     int64_t sum_split = 0;
 
@@ -306,8 +310,8 @@ void mrac_controller(int world_size) {
     double n_old = 0;
     MPI_Bcast(&n_new, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
-    auto T2 = system_clock::now();
-    auto Dura = duration_cast<microseconds>(T2 - T1).count();
+    auto T3 = system_clock::now();
+    Dura = duration_cast<microseconds>(T3 - T1).count();
     cout << "data prepare: " << double(Dura) / 1000000 << endl;
 
     for (int epoch = 1; epoch <= END_EPOCH; epoch += 1) {

@@ -174,7 +174,7 @@ void mrac_worker(int world_rank, int world_size) {
                   MPI_COMM_WORLD);
 
     for (uint32_t i = 1; i <= max_size; i++) {
-      dist_new[i] = dist_new[i] / n_new;
+      dist_new[i] /= n_new;
       // cout << "processor " << world_rank << " " << i << " " << ns[i] << " "
       //      << dist_new[i] << endl;
     }
