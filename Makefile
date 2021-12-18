@@ -17,6 +17,18 @@ mpi-mrac-v1: BOBHash32.o mpi-mrac-v1.o
 mpi-mrac-v2: BOBHash32.o mpi-mrac-v2.o
 	$(MPICXX) $(CXXFLAGS) $^ -o $@
 
+mrac.o: mrac.cpp EMFSD.h MRAC.h
+	$(CXX) $(CXXFLAGS) $< -c -o $@
+
+mpi-mrac-v1.o: mpi-mrac-v1.cpp EMFSD.h MRAC.h
+	$(CXX) $(CXXFLAGS) $< -c -o $@
+
+mpi-mrac-v2.o: mpi-mrac-v2.cpp EMFSD.h MRAC.h
+	$(CXX) $(CXXFLAGS) $< -c -o $@
+
+BOBHash32.o: BOBHash32.cpp BOBHash32.h
+	$(CXX) $(CXXFLAGS) $< -c -o $@
+
 clean:
 	rm -f $(OBJS)
 	rm -f $(EXES)

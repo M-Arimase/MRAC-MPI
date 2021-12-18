@@ -171,7 +171,7 @@ void mrac_worker(int world_rank, int world_size) {
     auto t1 = system_clock::now();
     */
 
-    memcpy(dist_old, dist_new, (max_size + 1) * sizeof(double));
+    swap(dist_old, dist_new);
     n_old = n_new;
 
     // double lambda = std::exp(n_old / double(w));
@@ -219,6 +219,13 @@ void mrac_worker(int world_rank, int world_size) {
       dist_new[i] = dist_new[i] / n_new;
     }
   }
+
+  delete[] split;
+  delete[] counter_dist;
+  delete[] dist_new;
+  delete[] dist_old;
+  delete[] ns;
+  delete[] ps;
 }
 
 void mrac_controller(int world_size) {

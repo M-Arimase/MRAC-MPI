@@ -102,17 +102,20 @@ public:
 
   double get_p_from_beta(BetaGenerator &bt, double lambda,
                          vector<double> &now_dist, double now_n) {
-    std::unordered_map<uint32_t, uint32_t> mp;
+    std::map<uint32_t, uint32_t> mp;
     for (int i = 0; i < bt.now_flow_num; ++i) {
       mp[bt.now_result[i]]++;
     }
 
-    double ret = std::exp(-lambda);
+    // double ret = std::exp(-lambda);
+    double ret = 1.0;
+    double div_n_w = now_n / w;
     for (auto &kv : mp) {
       uint32_t fi = kv.second;
       uint32_t si = kv.first;
-      double lambda_i = now_n * (now_dist[si]) / w;
-      ret *= (std::pow(lambda_i, fi)) / factorial(fi);
+      double lambda_i = now_dist[si] * div_n_w;
+      for (uint32_t k = 1; k <= fi; ++k)
+        ret *= lambda_i / k;
     }
 
     return ret;

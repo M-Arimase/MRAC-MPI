@@ -122,11 +122,13 @@ void mrac_worker(int world_rank, int world_size) {
   MPI_Bcast(&w, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
   for (int epoch = 1; epoch <= 20; epoch += 1) {
-    // cout << "processor " << world_rank << " epoch " << epoch << " begin"
-    //      << endl;
+    /*
+    cout << "processor " << world_rank << " epoch " << epoch << " begin"
+         << endl;
     auto t1 = system_clock::now();
+    */
 
-    memcpy(dist_old, dist_new, (max_size + 1) * sizeof(double));
+    swap(dist_old, dist_new);
     n_old = n_new;
 
     double lambda = n_old / double(w);
@@ -158,11 +160,12 @@ void mrac_worker(int world_rank, int world_size) {
       n_ns += ns[i];
     }
 
+    /*
     auto t2 = system_clock::now();
     auto duration = duration_cast<microseconds>(t2 - t1).count();
-
-    // cout << "processor " << world_rank << " epoch " << epoch << " finish"
-    //      << " duration " << double(duration) / 1000000 << " " << sum << endl;
+    cout << "processor " << world_rank << " epoch " << epoch << " finish"
+         << " duration " << double(duration) / 1000000 << " " << sum << endl;
+    */
 
     MPI_Allreduce(&n_ns, &n_new, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
     // cout << "processor " << world_rank << " " << n_ns << " " << n_new <<
@@ -176,6 +179,12 @@ void mrac_worker(int world_rank, int world_size) {
       //      << dist_new[i] << endl;
     }
   }
+
+  delete[] split;
+  delete[] counter_dist;
+  delete[] dist_new;
+  delete[] dist_old;
+  delete[] ns;
 }
 
 void mrac_controller(int world_size) {
