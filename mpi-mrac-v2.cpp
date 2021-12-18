@@ -141,10 +141,7 @@ void mrac_worker(int world_rank, int world_size) {
 
     EMFSD::BetaGenerator bts(i);
     while (bts.get_next()) {
-      vector<int> tmp;
-      for (int j = 0; j < bts.now_flow_num; j++) {
-        tmp.push_back(bts.now_result[j]);
-      }
+      vector<int> tmp(bts.now_result.begin(), bts.now_result.begin() + bts.now_flow_num);
       p1[i].push_back(get_p_from_beta_1(tmp));
       bts_result[i].push_back(move(tmp));
       total_bts_size += bts.now_flow_num;
